@@ -5,6 +5,7 @@ $erro_email = "";
 $erro_senha = "";
 $erro_login = "";
 
+
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     if (empty($_POST['email'])) {
