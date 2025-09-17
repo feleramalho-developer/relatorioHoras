@@ -8,16 +8,25 @@ require 'vendor/autoload.php';
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
 // CONFIGURAÇÃO BANCO
+/*
 $host = "localhost";
 $user = "root";
 $pass = "";
 $db = "lancamento_db";
+*/
+$host = "caboose.proxy.rlwy.net"; // confirme no Railway
+$port = 46551; // confirme a porta no Railway
+$user = "root"; // ou o usuário que aparece lá
+$pass = "GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
+$db = "usuario"; // confirme o nome do banco
 
 // CONEXÃO COM BANCO
+
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8", $user, $pass);
+    $pdo = new PDO("mysql:host=$host;port=$port;dbname=$db;charset=utf8", $user, $pass);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->exec("CREATE DATABASE IF NOT EXISTS $db");
+    $pdo->exec("CREATE DATABASE IF NOT EXISTS `$db`");
+    /*
     $pdo->exec("CREATE TABLE IF NOT EXISTS movimentacoes (
         id INT AUTO_INCREMENT PRIMARY KEY,
         cliente VARCHAR(255) NOT NULL,
@@ -28,10 +37,12 @@ try {
         usuario VARCHAR(100),
         dlancamento DATE NOT NULL
     )");
+    */
     
 } catch (PDOException $e) {
     die("Erro na conexão: " . $e->getMessage());
 }
+
 
 // EXCLUIR REGISTRO
 if (isset($_GET['excluir'])) {

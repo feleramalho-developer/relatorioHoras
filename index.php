@@ -16,11 +16,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     if (empty($erro_email) && empty($erro_senha)) {
-        $email = $mysqli->real_escape_string($_POST['email']);
-        $senha = $mysqli->real_escape_string($_POST['senha']);
+        $email = $conn->real_escape_string($_POST['email']);
+        $senha = $conn->real_escape_string($_POST['senha']);
 
-        $sql_code = "SELECT * FROM usuarios WHERE email = '$email' AND senha = '$senha'";
-        $sql_query = $mysqli->query($sql_code) or die("Falha na execução do SQL: " . $mysqli->error);
+        $sql_code = "SELECT * FROM usuario WHERE email = '$email' AND senha = '$senha'";
+        $sql_query = $conn->query($sql_code) or die("Falha na execução do SQL: " . $conn->error);
 
         if ($sql_query->num_rows == 1) {
             $usuario = $sql_query->fetch_assoc();
