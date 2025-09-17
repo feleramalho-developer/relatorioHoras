@@ -1,13 +1,13 @@
 <?php
 
-$host = "caboose.proxy.rlwy.net"; // confirme no Railway
-$port = 46551; // confirme a porta no Railway
-$user = "root"; // ou o usuário que aparece lá
-$password = "GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
-$db = "usuario"; // confirme o nome do banco
+$host = $MYSQLHOST;//"caboose.proxy.rlwy.net"; 
+$port = $MYSQLPORT;//46551; 
+$user = $MYSQLUSER;//"root"; 
+$password = $MYSQLPASSWORD;//"GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
+$db = $MYSQL_DATABASE;//"usuario"; 
 
-$conn = new mysqli($host, $user, $password, $db, $port);
+$mysqli = new mysqli($host, $user, $password, $db, $port);
 
-if ($conn->connect_error) {
-    die("Erro na conexão: " . $conn->connect_error);
+if ($mysqli->connect_error) {
+    die("Erro na conexão: " . $mysqli->connect_error);
 }

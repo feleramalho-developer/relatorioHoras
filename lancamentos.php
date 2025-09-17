@@ -14,11 +14,18 @@ $user = "root";
 $pass = "";
 $db = "lancamento_db";
 */
-$host = "caboose.proxy.rlwy.net"; // confirme no Railway
+/*$host = "caboose.proxy.rlwy.net"; // confirme no Railway
 $port = 46551; // confirme a porta no Railway
 $user = "root"; // ou o usuário que aparece lá
 $pass = "GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
 $db = "usuario"; // confirme o nome do banco
+*/
+
+$host = $MYSQLHOST;//"caboose.proxy.rlwy.net"; 
+$port = $MYSQLPORT;//46551; 
+$user = $MYSQLUSER;//"root"; 
+$password = $MYSQLPASSWORD;//"GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
+$db = $MYSQL_DATABASE;//"usuario"; 
 
 // CONEXÃO COM BANCO
 
