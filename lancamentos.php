@@ -147,7 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST['editar_id']) && !isse
             VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$cliente, $projeto, $tarefa ?: null, $horas, $observacao, $usuarioLogado, $dlancamento]);
 
-        echo "<div class='alert success'>Lançamento salvo com sucesso!</div>";
+        //echo "<div class='alert success'>Lançamento salvo com sucesso!</div>";
         header("Refresh: 1; url=" . $_SERVER['PHP_SELF']); 
         exit;
     } catch (Exception $e) {
