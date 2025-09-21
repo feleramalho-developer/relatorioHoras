@@ -4,7 +4,7 @@ $host = "caboose.proxy.rlwy.net";
 $port = 46551; 
 $user = "root"; 
 $password = "GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
-$db = "usuario"; 
+$db = "railway"; 
 
 $mysqli = new mysqli($host, $user, $password, $db, $port);
 

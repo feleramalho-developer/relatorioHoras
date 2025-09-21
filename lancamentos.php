@@ -21,20 +21,20 @@ $pass = "GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
 $db = "usuario"; // confirme o nome do banco
 */
 
-$host = $MYSQLHOST;//"caboose.proxy.rlwy.net"; 
-$port = $MYSQLPORT;//46551; 
-$user = $MYSQLUSER;//"root"; 
-$password = $MYSQLPASSWORD;//"GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
-$db = $MYSQL_DATABASE;//"usuario"; 
+$host = "caboose.proxy.rlwy.net"; 
+$user = "root"; 
+$password = "GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
+$port = 46551; 
+$db = "railway"; 
 
 // CONEXÃO COM BANCO
 
 try {
-    $pdo = new PDO("mysql:host=$host;port=$port;dbname=$db;charset=utf8", $user, $pass);
+    $pdo = new PDO("mysql:host=$host;port=$port;dbname=$db;charset=utf8", $user, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->exec("CREATE DATABASE IF NOT EXISTS `$db`");
     /*
-    $pdo->exec("CREATE TABLE IF NOT EXISTS movimentacoes (
+    $pdo->exec("CREATE DATABASE IF NOT EXISTS `$db`");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS lancamentos (
         id INT AUTO_INCREMENT PRIMARY KEY,
         cliente VARCHAR(255) NOT NULL,
         projeto VARCHAR(255) NOT NULL,
@@ -54,7 +54,7 @@ try {
 // EXCLUIR REGISTRO
 if (isset($_GET['excluir'])) {
     $id = intval($_GET['excluir']);
-    $pdo->prepare("DELETE FROM movimentacoes WHERE id=? ")->execute([$id]);   
+    $pdo->prepare("DELETE FROM lancamentos WHERE id=? ")->execute([$id]);   
     header("Location: " . $_SERVER['PHP_SELF']);
     exit;
 }
@@ -62,7 +62,7 @@ if (isset($_GET['excluir'])) {
 // EDITAR REGISTRO
 if (!empty($_POST['editar_id'])) {
     try {
-        $stmt = $pdo->prepare("UPDATE movimentacoes 
+        $stmt = $pdo->prepare("UPDATE lancamentos 
             SET cliente=?, projeto=?, tarefa=?, horas=?, observacao=?, usuario=?, dlancamento=? 
             WHERE id=? AND usuario=?");
         $stmt->execute([
@@ -96,7 +96,7 @@ if (isset($_POST['importar']) && isset($_FILES['arquivo'])) {
             // Remove cabeçalho
             $cabecalho = array_shift($rows);
 
-            $sql = "INSERT INTO movimentacoes (cliente, projeto, tarefa, horas, observacao, usuario, dlancamento)
+            $sql = "INSERT INTO lancamentos (cliente, projeto, tarefa, horas, observacao, usuario, dlancamento)
                     VALUES (:cliente, :projeto, :tarefa, :horas, :observacao, :usuario, :dlancamento)";
             $stmt = $pdo->prepare($sql);
 
@@ -127,7 +127,7 @@ $por_pagina = isset($por_pagina) ? (int)$por_pagina : 20;
 $pagina = isset($pagina) ? max(1, (int)$pagina) : (isset($_GET['pagina']) ? max(1, intval($_GET['pagina'])) : 1);
 $offset = ($pagina - 1) * $por_pagina;
 
-$stmt_count = $pdo->query("SELECT COUNT(*) FROM movimentacoes");
+$stmt_count = $pdo->query("SELECT COUNT(*) FROM lancamentos");
 $total_registros = (int) $stmt_count->fetchColumn();
 $total_paginas = max(1, (int) ceil($total_registros / $por_pagina));
 // --- Fim correção: cálculo da paginação ---
@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST['editar_id']) && !isse
     $dlancamento = $_POST['dlancamento'];
 
     try {
-        $stmt = $pdo->prepare("INSERT INTO movimentacoes 
+        $stmt = $pdo->prepare("INSERT INTO lancamentos 
             (cliente, projeto, tarefa, horas, observacao, usuario, dlancamento)
             VALUES (?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$cliente, $projeto, $tarefa ?: null, $horas, $observacao, $usuarioLogado, $dlancamento]);
@@ -159,8 +159,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST['editar_id']) && !isse
 $mes = $_GET['mes'] ?? null;
 $ano = $_GET['ano'] ?? null;
 
-$sql = "SELECT * FROM movimentacoes WHERE usuario = :usuario";
-$countSql = "SELECT COUNT(*) FROM movimentacoes WHERE usuario = :usuario";
+$sql = "SELECT * FROM lancamentos WHERE usuario = :usuario";
+$countSql = "SELECT COUNT(*) FROM lancamentos WHERE usuario = :usuario";
 $params = [':usuario' => $usuarioLogado];
 
 if (!empty($mes)) {
