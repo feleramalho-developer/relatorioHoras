@@ -1,14 +1,13 @@
 <?php
 
-$host = "caboose.proxy.rlwy.net";
-$port = 46551;
-$user = "root";
-$password = "GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
-$db = "railway";
+$host = getenv('MYSQL_HOST');
+$user = getenv('MYSQL_USER');
+$pass = getenv('MYSQL_PASSWORD');
+$db = getenv('MYSQL_DATABASE');
 
-$mysqli = new mysqli($host, $user, $password, $db, $port);
+$mysqli = new mysqli($host, $user, $pass, $db);
 
-if ($mysqli->connect_error) {
+if ($mysqli->connect_errno) {
     die("Falha na conexão: " . $mysqli->connect_error);
 }
 
