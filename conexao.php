@@ -1,10 +1,10 @@
 <?php
 
-$host = $MYSQLHOST;//"caboose.proxy.rlwy.net"; 
-$port = $MYSQLPORT;//46551; 
-$user = $MYSQLUSER;//"root"; 
-$password = $MYSQLPASSWORD;//"GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
-$db = $MYSQL_DATABASE;//"usuario"; 
+$host = "caboose.proxy.rlwy.net"; 
+$port = 46551; 
+$user = "root"; 
+$password = "GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
+$db = "usuario"; 
 
 $mysqli = new mysqli($host, $user, $password, $db, $port);
 
