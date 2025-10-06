@@ -152,7 +152,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <?php if (!empty($erro_login)) echo "<p class='erro'>$erro_login</p>"; ?>
         </form>
         <footer>
-            <p>Sistema desenvolvido por <strong>Felipe Santos</strong> - Action Process</p>
+            <p>Sistema desenvolvido por <strong>Felipe Santos</strong> - Action Tech</p>
             <p>&copy; 2025 Todos os direitos reservados</p>
         </footer>
     </div>
