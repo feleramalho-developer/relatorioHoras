@@ -27,6 +27,8 @@ if (!$usuarioLogado) {
     exit;
 }
 
+
+
 // ------------------------
 // TRATAMENTO DE AÇÕES
 // ------------------------
@@ -44,54 +46,44 @@ if (isset($_GET['excluir'])) {
     }
 }
 
-// IMPORTAR PLANILHA (envio via POST com name="importar")
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['importar'])) {
-    if (!empty($_FILES['arquivo']['tmp_name'])) {
-        $arquivo = $_FILES['arquivo']['tmp_name'];
+// --- Importar Planilha XLSX ---
+if (isset($_POST['importar']) && isset($_FILES['arquivo'])) {
+    $arquivo = $_FILES['arquivo']['tmp_name'];
+    if ($arquivo) {
         try {
             $spreadsheet = IOFactory::load($arquivo);
             $sheet = $spreadsheet->getActiveSheet();
             $rows = $sheet->toArray();
 
-            // remove cabeçalho
+            // Remove cabeçalho
             $cabecalho = array_shift($rows);
 
             $sql = "INSERT INTO lancamentos (cliente, projeto, tarefa, horas, observacao, usuario, dlancamento)
-                    VALUES (:cliente, :projeto, :tarefa, :horas, :observacao, :usuario, :dlancamento)";
+ VALUES (:cliente, :projeto, :tarefa, :horas, :observacao, :usuario, :dlancamento)";
             $stmt = $pdo->prepare($sql);
 
             foreach ($rows as $row) {
-                // supondo colunas: cliente, projeto, tarefa, horas, observacao, usuarioOpcional, data
-                // para segurança, atribuímos o usuário logado aos registros importados
-                $cliente = $row[0] ?? '';
-                $projeto = $row[1] ?? '';
-                $tarefa = $row[2] ?? null;
-                $horas = $row[3] ?? '00:00';
-                $observacao = $row[4] ?? '';
-                $dl = $row[6] ?? date('Y-m-d');
-
-                // converter data para formato Y-m-d (se possível)
-                $dl_parsed = date('Y-m-d', strtotime($dl));
+                // Ignorar linhas completamente vazias
+                if (empty(array_filter($row)))
+                    continue;
 
                 $stmt->execute([
-                    ':cliente' => $cliente,
-                    ':projeto' => $projeto,
-                    ':tarefa' => $tarefa,
-                    ':horas' => $horas,
-                    ':observacao' => $observacao,
-                    ':usuario' => $usuarioLogado,
-                    ':dlancamento' => $dl_parsed
+                    ':cliente' => trim($row[0] ?? ''),
+                    ':projeto' => trim($row[1] ?? ''),
+                    ':tarefa' => trim($row[2] ?? null),
+                    ':horas' => trim($row[3] ?? '00:00'),
+                    ':observacao' => trim($row[4] ?? ''),
+                    ':usuario' => trim($row[5] ?? ''),
+                    ':dlancamento' => date('Y-m-d', strtotime($row[6] ?? date('Y-m-d')))
                 ]);
             }
-
-            header('Location: ' . $_SERVER['PHP_SELF']);
+            echo "<div class='alert success'>Importação concluída com sucesso!</div>";
+            header("Location: " . $_SERVER['PHP_SELF'] . "?import=ok");
             exit;
 
         } catch (Exception $e) {
-            $erroGeral = "Erro ao importar: " . $e->getMessage();
+            echo "<div class='alert error'>Erro ao importar: " . $e->getMessage() . "</div>";
         }
-    } else {
-        $erroGeral = "Nenhum arquivo selecionado para importação.";
     }
 }
 
@@ -492,12 +484,15 @@ function h($v)
             $anoSelecionado = (int) $anoSelecionado;
             ?>
 
-            <form method="post" enctype="multipart/form-data" style="margin-top:8px;">
-                <h2><i class="fa-solid fa-file-import"></i> Importar Planilha</h2>
-                <input type="file" name="arquivo" accept=".csv,.xlsx">
-                <button type="submit" name="importar" style="margin-top:8px;"><i class="fa-solid fa-upload"></i>
-                    Importar</button>
-            </form>
+            <?php if ($usuarioLogado === 'Felipe Santos'): ?>
+                <form method="post" enctype="multipart/form-data" style="margin-top:8px;">
+                    <h2><i class="fa-solid fa-file-import"></i> Importar Planilha</h2>
+                    <input type="file" name="arquivo" accept=".csv,.xlsx">
+                    <button type="submit" name="importar" style="margin-top:8px;">
+                        <i class="fa-solid fa-upload"></i> Importar
+                    </button>
+                </form>
+            <?php endif; ?>
         </div>
 
         <!-- direita: tabela -->
@@ -529,10 +524,10 @@ function h($v)
                     ?>
                 </select>
                 <button type="button"
-        onclick="window.location='lancamentos.php?mes=<?php echo date('m'); ?>&ano=<?php echo date('Y'); ?>'"
-        style="padding:6px 10px; border-radius:6px; background:#c82333; color:white; border:none; cursor:pointer;">
-    <i class="fa-solid fa-eraser"></i> Limpar
-</button>
+                    onclick="window.location='lancamentos.php?mes=<?php echo date('m'); ?>&ano=<?php echo date('Y'); ?>'"
+                    style="padding:6px 10px; border-radius:6px; background:#c82333; color:white; border:none; cursor:pointer;">
+                    <i class="fa-solid fa-eraser"></i> Limpar
+                </button>
 
 
             </form>
