@@ -461,7 +461,22 @@ function h($v)
                 <h2><i class="fa-solid fa-plus"></i> Novo Lançamento</h2>
                 <input type="hidden" name="editar_id" id="editar_id" value="">
                 <label><small>Cliente</small></label>
-                <input type="text" name="cliente" placeholder="Cliente" required>
+                <select name="cliente" required>
+                    <option value="">Selecione o cliente</option>
+                    <?php
+                    // Busca clientes distintos da tabela
+                    $sql = "SELECT DISTINCT cliente FROM clientes_consultoria ORDER BY cliente ASC";
+                    $stmt = $pdo->query($sql);
+                    $clientes = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+                    foreach ($clientes as $cli):
+                        ?>
+                        <option value="<?= htmlspecialchars($cli) ?>">
+                            <?= htmlspecialchars($cli) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+
                 <label><small>Projeto</small></label>
                 <input type="text" name="projeto" placeholder="Projeto" required>
                 <label><small>Tarefa</small></label>
