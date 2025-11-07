@@ -95,11 +95,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['editar_id']) && !iss
     $tarefa = trim($_POST['tarefa'] ?? null);
     $horas = trim($_POST['horas'] ?? '');
     $observacao = trim($_POST['observacao'] ?? '');
+    $faturavel = trim($_POST['faturavel'] ?? '');
     $dlancamento = trim($_POST['dlancamento'] ?? '');
 
     try {
         $stmtUp = $pdo->prepare("UPDATE lancamentos
-            SET cliente = :cliente, projeto = :projeto, tarefa = :tarefa, horas = :horas, observacao = :observacao, usuario = :usuario, dlancamento = :dlancamento
+            SET cliente = :cliente, projeto = :projeto, tarefa = :tarefa, horas = :horas, observacao = :observacao, faturavel = :faturavel, usuario = :usuario, dlancamento = :dlancamento
             WHERE id = :id AND usuario = :usuario");
         $stmtUp->execute([
             ':cliente' => $cliente,
@@ -107,6 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['editar_id']) && !iss
             ':tarefa' => $tarefa ?: null,
             ':horas' => $horas,
             ':observacao' => $observacao,
+            ':faturavel' => $faturavel,
             ':usuario' => $usuarioLogado,
             ':dlancamento' => $dlancamento,
             ':id' => $editar_id
@@ -126,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST['editar_id']) && !isse
     $tarefa = trim($_POST['tarefa'] ?? null);
     $horas = trim($_POST['horas'] ?? '');
     $observacao = trim($_POST['observacao'] ?? '');
+    $faturavel = trim($_POST['faturavel'] ?? '');
     $dlancamento = trim($_POST['dlancamento'] ?? '');
 
     // validações mínimas
@@ -133,14 +136,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST['editar_id']) && !isse
         $erroGeral = "Preencha os campos obrigatórios (Cliente, Projeto, Horas, Data).";
     } else {
         try {
-            $stmtIns = $pdo->prepare("INSERT INTO lancamentos (cliente, projeto, tarefa, horas, observacao, usuario, dlancamento)
-                VALUES (:cliente, :projeto, :tarefa, :horas, :observacao, :usuario, :dlancamento)");
+            $stmtIns = $pdo->prepare("INSERT INTO lancamentos (cliente, projeto, tarefa, horas, observacao, faturavel, usuario, dlancamento)
+                VALUES (:cliente, :projeto, :tarefa, :horas, :observacao, :faturavel, :usuario, :dlancamento)");
             $stmtIns->execute([
                 ':cliente' => $cliente,
                 ':projeto' => $projeto,
                 ':tarefa' => $tarefa ?: null,
                 ':horas' => $horas,
                 ':observacao' => $observacao,
+                ':faturavel' => $faturavel,
                 ':usuario' => $usuarioLogado,
                 ':dlancamento' => $dlancamento
             ]);
@@ -465,7 +469,7 @@ function h($v)
                     <option value="">Selecione o cliente</option>
                     <?php
                     // Busca clientes distintos da tabela
-                    $sql = "SELECT DISTINCT cliente FROM clientes_consultoria ORDER BY cliente ASC";
+                    $sql = "SELECT DISTINCT cliente FROM clientes_consultoria where status = 'Ativo' ORDER BY cliente ASC";
                     $stmt = $pdo->query($sql);
                     $clientes = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
@@ -487,6 +491,11 @@ function h($v)
                 <textarea name="observacao" rows="3" placeholder="Observação"></textarea>
                 <label><small>Data</small></label>
                 <input type="date" name="dlancamento" required>
+                <label><small>Faturável?</small></label>
+                <select name="faturavel">
+                    <option value="1" <?= (isset($editLead['faturavel']) && $editLead['faturavel'] == 1) ? 'selected' : '' ?>>Sim</option>
+                    <option value="0" <?= (isset($editLead['faturavel']) && $editLead['faturavel'] == 0) ? 'selected' : '' ?>>Não</option>
+                </select>
                 <button type="submit" style="margin-top:10px;"><i class="fa-solid fa-save"></i> Salvar</button>
             </form>
             <?php
@@ -556,6 +565,7 @@ function h($v)
                     <th>Tarefa</th>
                     <th>Horas</th>
                     <th>Observação</th>
+                    <th>Faturável</th>
                     <th>Data</th>
                     <th>Ações</th>
                 </tr>
@@ -574,7 +584,12 @@ function h($v)
                             <td><?php echo h($m['tarefa']); ?></td>
                             <td><?php echo h($m['horas']); ?></td>
                             <td><?php echo h($m['observacao']); ?></td>
-                            <td><?php echo h($m['dlancamento']); ?></td>
+                            <td><?php echo $m['faturavel'] == 1 ? 'Sim' : 'Não'; ?></td>
+                            <td>
+                                <?= !empty($m['dlancamento'])
+                                    ? htmlspecialchars(date('d/m/Y', strtotime($m['dlancamento'])))
+                                    : '' ?>
+                            </td>
                             <td>
                                 <a class="action-btn delete" href="?excluir=<?php echo h($m['id']); ?>" title="Excluir"
                                     onclick="return confirm('Confirma exclusão?');"><i class="fa-solid fa-trash"></i></a>
@@ -584,6 +599,7 @@ function h($v)
                                     data-projeto="<?php echo h($m['projeto']); ?>" data-tarefa="<?php echo h($m['tarefa']); ?>"
                                     data-horas="<?php echo h($m['horas']); ?>"
                                     data-observacao="<?php echo h($m['observacao']); ?>"
+                                    data-faturavel="<?php echo h($m['faturavel']); ?>"
                                     data-dlancamento="<?php echo h($m['dlancamento']); ?>" title="Editar"><i
                                         class="fa-solid fa-pen"></i></button>
                             </td>
@@ -633,6 +649,7 @@ function h($v)
                 // some browsers require HH:MM for input type time; keep the value if compatible
                 document.querySelector('[name=horas]').value = this.dataset.horas || '';
                 document.querySelector('[name=observacao]').value = this.dataset.observacao || '';
+                document.querySelector('[name=faturavel]').value = this.dataset.faturavel || '';
                 document.querySelector('[name=dlancamento]').value = this.dataset.dlancamento || '';
                 // scroll to top where form is
                 window.scrollTo({ top: 0, behavior: 'smooth' });
