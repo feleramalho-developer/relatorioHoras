@@ -439,6 +439,24 @@ function h($v)
             font-size: 12px;
             width: inherit;
         }
+
+        .btn-indicadores {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 12px;
+            background: #1f7071;
+            color: #fff;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: background 0.2s ease;
+        }
+
+        .btn-indicadores:hover {
+            background: #2fa4a4;
+        }
     </style>
 </head>
 
@@ -521,7 +539,15 @@ function h($v)
 
         <!-- direita: tabela -->
         <div class="right-panel">
-            <h2><i class="fa-solid fa-table"></i> Lançamentos</h2>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h2 style="margin:0;">
+                    <i class="fa-solid fa-table"></i> Lançamentos
+                </h2>
+
+                <a href="indicadores.php?mes=<?= $mesSelecionado ?>&ano=<?= $anoSelecionado ?>" class="btn-indicadores">
+                    <i class="fa-solid fa-chart-line"></i> Indicadores
+                </a>
+            </div>
             <form method="GET" id="filtroForm"
                 style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
                 <label for="mes">Mês:</label>
