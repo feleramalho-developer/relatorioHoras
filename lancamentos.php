@@ -58,8 +58,8 @@ if (isset($_POST['importar']) && isset($_FILES['arquivo'])) {
             // Remove cabeçalho
             $cabecalho = array_shift($rows);
 
-            $sql = "INSERT INTO lancamentos (cliente, projeto, tarefa, horas, observacao, usuario, dlancamento)
- VALUES (:cliente, :projeto, :tarefa, :horas, :observacao, :usuario, :dlancamento)";
+            $sql = "INSERT INTO lancamentos (cliente, projeto, tarefa, horas, observacao, usuario, dlancamento, fase)
+ VALUES (:cliente, :projeto, :tarefa, :horas, :observacao, :usuario, :dlancamento, :fase)";
             $stmt = $pdo->prepare($sql);
 
             foreach ($rows as $row) {
@@ -74,7 +74,8 @@ if (isset($_POST['importar']) && isset($_FILES['arquivo'])) {
                     ':horas' => trim($row[3] ?? '00:00'),
                     ':observacao' => trim($row[4] ?? ''),
                     ':usuario' => trim($row[5] ?? ''),
-                    ':dlancamento' => date('Y-m-d', strtotime($row[6] ?? date('Y-m-d')))
+                    ':dlancamento' => date('Y-m-d', strtotime($row[6] ?? date('Y-m-d'))),
+                    ':fase' => trim($row[7] ?? ''),
                 ]);
             }
             echo "<div class='alert success'>Importação concluída com sucesso!</div>";
@@ -97,10 +98,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['editar_id']) && !iss
     $observacao = trim($_POST['observacao'] ?? '');
     $faturavel = trim($_POST['faturavel'] ?? '');
     $dlancamento = trim($_POST['dlancamento'] ?? '');
+    $fase = trim($_POST['fase'] ?? '');
 
     try {
         $stmtUp = $pdo->prepare("UPDATE lancamentos
-            SET cliente = :cliente, projeto = :projeto, tarefa = :tarefa, horas = :horas, observacao = :observacao, faturavel = :faturavel, usuario = :usuario, dlancamento = :dlancamento
+            SET cliente = :cliente, projeto = :projeto, tarefa = :tarefa, horas = :horas, observacao = :observacao, faturavel = :faturavel, usuario = :usuario, dlancamento = :dlancamento, fase = :fase
             WHERE id = :id AND usuario = :usuario");
         $stmtUp->execute([
             ':cliente' => $cliente,
@@ -111,6 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['editar_id']) && !iss
             ':faturavel' => $faturavel,
             ':usuario' => $usuarioLogado,
             ':dlancamento' => $dlancamento,
+            ':fase' => $fase,
             ':id' => $editar_id
         ]);
 
@@ -130,14 +133,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST['editar_id']) && !isse
     $observacao = trim($_POST['observacao'] ?? '');
     $faturavel = trim($_POST['faturavel'] ?? '');
     $dlancamento = trim($_POST['dlancamento'] ?? '');
+    $fase = trim($_POST['fase'] ?? '');
 
     // validações mínimas
     if ($cliente === '' || $projeto === '' || $horas === '' || $dlancamento === '') {
         $erroGeral = "Preencha os campos obrigatórios (Cliente, Projeto, Horas, Data).";
     } else {
         try {
-            $stmtIns = $pdo->prepare("INSERT INTO lancamentos (cliente, projeto, tarefa, horas, observacao, faturavel, usuario, dlancamento)
-                VALUES (:cliente, :projeto, :tarefa, :horas, :observacao, :faturavel, :usuario, :dlancamento)");
+            $stmtIns = $pdo->prepare("INSERT INTO lancamentos (cliente, projeto, tarefa, horas, observacao, faturavel, usuario, dlancamento, fase)
+                VALUES (:cliente, :projeto, :tarefa, :horas, :observacao, :faturavel, :usuario, :dlancamento, :fase)");
             $stmtIns->execute([
                 ':cliente' => $cliente,
                 ':projeto' => $projeto,
@@ -146,7 +150,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST['editar_id']) && !isse
                 ':observacao' => $observacao,
                 ':faturavel' => $faturavel,
                 ':usuario' => $usuarioLogado,
-                ':dlancamento' => $dlancamento
+                ':dlancamento' => $dlancamento,
+                ':fase' => $fase
             ]);
             header("Location: " . $_SERVER['PHP_SELF']);
             exit;
@@ -503,6 +508,18 @@ function h($v)
                 <input type="text" name="projeto" placeholder="Projeto" required>
                 <label><small>Tarefa</small></label>
                 <input type="text" name="tarefa" placeholder="Tarefa">
+                <label><small>Fase</small></label>
+                <select type="text" name="fase">
+                    <option value="Mapeamento" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Mapeamento') ? 'selected' : '' ?>>Mapeamento</option>
+                    <option value="Análise" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Análise') ? 'selected' : '' ?>>Análise</option>
+                    <option value="Redesenho" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Redesenho') ? 'selected' : '' ?>>Redesenho</option>
+                    <option value="Validação e Aprovação" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Validação e Aprovação') ? 'selected' : '' ?>>Validação e Aprovação</option>
+                    <option value="Desenvolvimento" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Desenvolvimento') ? 'selected' : '' ?>>Desenvolvimento</option>
+                    <option value="Validação Técnica" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Validação Técnica') ? 'selected' : '' ?>>Validação Técnica</option>
+                    <option value="Piloto" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Piloto') ? 'selected' : '' ?>>Piloto</option>
+                    <option value="Produção" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Produção') ? 'selected' : '' ?>>Produção</option>
+                    <option value="Processo Entregue" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Processo Entregue') ? 'selected' : '' ?>>Processo Entregue</option>
+                </select>
                 <label><small>Horas (HH:MM)</small></label>
                 <input type="time" name="horas" required>
                 <label><small>Observação</small></label>
@@ -589,6 +606,7 @@ function h($v)
                     <th>Cliente</th>
                     <th>Projeto</th>
                     <th>Tarefa</th>
+                    <th>Fase</th>
                     <th>Horas</th>
                     <th>Observação</th>
                     <th>Faturável</th>
@@ -608,6 +626,7 @@ function h($v)
                             <td><?php echo h($m['cliente']); ?></td>
                             <td><?php echo h($m['projeto']); ?></td>
                             <td><?php echo h($m['tarefa']); ?></td>
+                            <td><?php echo h($m['fase']); ?></td>
                             <td><?php echo h($m['horas']); ?></td>
                             <td><?php echo h($m['observacao']); ?></td>
                             <td><?php echo $m['faturavel'] == 1 ? 'Sim' : 'Não'; ?></td>
@@ -623,10 +642,12 @@ function h($v)
                                 <button type="button" class="action-btn edit editarBtn" data-id="<?php echo h($m['id']); ?>"
                                     data-cliente="<?php echo h($m['cliente']); ?>"
                                     data-projeto="<?php echo h($m['projeto']); ?>" data-tarefa="<?php echo h($m['tarefa']); ?>"
+                                    data-fase="<?php echo h($m['fase']); ?>"
                                     data-horas="<?php echo h($m['horas']); ?>"
                                     data-observacao="<?php echo h($m['observacao']); ?>"
                                     data-faturavel="<?php echo h($m['faturavel']); ?>"
-                                    data-dlancamento="<?php echo h($m['dlancamento']); ?>" title="Editar"><i
+                                    data-dlancamento="<?php echo h($m['dlancamento']); ?>"
+                                     title="Editar"><i
                                         class="fa-solid fa-pen"></i></button>
                             </td>
                         </tr>
@@ -672,6 +693,7 @@ function h($v)
                 document.querySelector('[name=cliente]').value = this.dataset.cliente || '';
                 document.querySelector('[name=projeto]').value = this.dataset.projeto || '';
                 document.querySelector('[name=tarefa]').value = this.dataset.tarefa || '';
+                document.querySelector('[name=fase]').value = this.dataset.fase || '';
                 // some browsers require HH:MM for input type time; keep the value if compatible
                 document.querySelector('[name=horas]').value = this.dataset.horas || '';
                 document.querySelector('[name=observacao]').value = this.dataset.observacao || '';
