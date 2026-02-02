@@ -249,8 +249,9 @@ try {
 // FUNÇÃO DE ESCAPE (uso repetido)
 function h($v)
 {
-    return htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
