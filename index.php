@@ -1,41 +1,44 @@
 <?php
-include('conexao.php');
+session_start();
+require_once __DIR__ . '/conexao.php';
 
-$erro_email = "";
-$erro_senha = "";
-$erro_login = "";
+$erro = '';
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = trim($_POST['email'] ?? '');
+    $senha = trim($_POST['senha'] ?? '');
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    if ($email === '' || $senha === '') {
+        $erro = 'Informe e-mail e senha.';
+    } else {
+        try {
+            $stmt = $pdo->prepare("
+                SELECT id, nome, email, senha, liberacao, statusConsultor
+                FROM usuario
+                WHERE email = :email
+                LIMIT 1
+            ");
 
-    if (empty($_POST['email'])) {
-        $erro_email = "Preencha seu e-mail";
-    }
+            $stmt->execute([
+                ':email' => $email
+            ]);
 
-    if (empty($_POST['senha'])) {
-        $erro_senha = "Preencha sua senha";
-    }
+            $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (empty($erro_email) && empty($erro_senha)) {
-        $email = $mysqli->real_escape_string($_POST['email']);
-        $senha = $mysqli->real_escape_string($_POST['senha']);
+            if ($usuario && $senha === $usuario['senha']) {
+                $_SESSION['id'] = $usuario['id'];
+                $_SESSION['nome'] = $usuario['nome'];
+                $_SESSION['email'] = $usuario['email'];
+                $_SESSION['liberacao'] = $usuario['liberacao'];
 
-        $sql_code = "SELECT * FROM usuario WHERE email = '$email' AND senha = '$senha'";
-        $sql_query = $mysqli->query($sql_code) or die("Falha na execução do SQL: " . $mysqli->error);
-
-        if ($sql_query->num_rows == 1) {
-            $usuario = $sql_query->fetch_assoc();
-
-            if (!isset($_SESSION)) {
-                session_start();
+                header('Location: lancamentos.php');
+                exit;
+            } else {
+                $erro = 'E-mail ou senha inválidos.';
             }
 
-            $_SESSION["id"] = $usuario['id'];
-            $_SESSION['nome'] = $usuario['nome'];
-            header("Location: lancamentos.php");
-            exit;
-        } else {
-            $erro_login = "Falha ao logar! E-mail ou senha incorretos.";
+        } catch (Exception $e) {
+            $erro = 'Erro ao realizar login: ' . $e->getMessage();
         }
     }
 }
@@ -139,17 +142,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <p>
                 <input type="text" placeholder="E-Mail" name="email" value="<?= $_POST['email'] ?? '' ?>">
                 <i class="bx bxs-user"></i>
-                <?php if (!empty($erro_email)) echo "<span class='erro'>$erro_email</span>"; ?>
+                <?php if (!empty($erro_email))
+                    echo "<span class='erro'>$erro_email</span>"; ?>
             </p>
             <p>
                 <input type="password" placeholder="Senha" name="senha">
                 <i class="bx bxs-lock-alt"></i>
-                <?php if (!empty($erro_senha)) echo "<span class='erro'>$erro_senha</span>"; ?>
+                <?php if (!empty($erro_senha))
+                    echo "<span class='erro'>$erro_senha</span>"; ?>
             </p>
             <p>
                 <button type="submit">Entrar</button>
             </p>
-            <?php if (!empty($erro_login)) echo "<p class='erro'>$erro_login</p>"; ?>
+            <?php if (!empty($erro_login))
+                echo "<p class='erro'>$erro_login</p>"; ?>
         </form>
         <footer>
             <p>Sistema desenvolvido por <strong>Felipe Santos</strong> - Action Process</p>
