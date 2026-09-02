@@ -4,20 +4,8 @@ include('protect.php'); // deve iniciar session e garantir login
 require 'vendor/autoload.php';
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
-// CONFIGURAÇÃO BANCO
-$host = "caboose.proxy.rlwy.net";
-$user = "root";
-$password = "GXccXsOkyfFEJUBWDwaALivuPWPHwYgP";
-$port = 46551;
-$db = "railway";
-
 // CONEXÃO COM BANCO (PDO)
-try {
-    $pdo = new PDO("mysql:host=$host;port=$port;dbname=$db;charset=utf8", $user, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch (PDOException $e) {
-    die("Erro na conexão: " . $e->getMessage());
-}
+require_once __DIR__ . '/conexao.php';
 
 // verificar usuário logado
 $usuarioLogado = $_SESSION['nome'] ?? null;
@@ -27,7 +15,30 @@ if (!$usuarioLogado) {
     exit;
 }
 
+// Verifica se o usuário pode acessar os indicadores
+$podeVerIndicadores = false;
 
+try {
+    $stmtPermissao = $pdo->prepare("
+        SELECT liberacao 
+        FROM usuario 
+        WHERE nome = :nome 
+        LIMIT 1
+    ");
+
+    $stmtPermissao->execute([
+        ':nome' => $usuarioLogado
+    ]);
+
+    $liberacaoUsuario = $stmtPermissao->fetchColumn();
+
+    if ((int) $liberacaoUsuario === 5) {
+        $podeVerIndicadores = true;
+    }
+
+} catch (Exception $e) {
+    $podeVerIndicadores = false;
+}
 
 // ------------------------
 // TRATAMENTO DE AÇÕES
@@ -100,6 +111,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['editar_id']) && !iss
     $dlancamento = trim($_POST['dlancamento'] ?? '');
     $fase = trim($_POST['fase'] ?? '');
 
+    // Regra de negócio: Action Process sempre deve ser não faturável
+    if (mb_strtolower($cliente, 'UTF-8') === mb_strtolower('Action Process', 'UTF-8')) {
+        $faturavel = 0;
+    } else {
+        $faturavel = ($faturavel === '1') ? 1 : 0;
+    }
+
     try {
         $stmtUp = $pdo->prepare("UPDATE lancamentos
             SET cliente = :cliente, projeto = :projeto, tarefa = :tarefa, horas = :horas, observacao = :observacao, faturavel = :faturavel, usuario = :usuario, dlancamento = :dlancamento, fase = :fase
@@ -135,6 +153,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST['editar_id']) && !isse
     $dlancamento = trim($_POST['dlancamento'] ?? '');
     $fase = trim($_POST['fase'] ?? '');
 
+    // Regra de negócio: Action Process sempre deve ser não faturável
+    if (mb_strtolower($cliente, 'UTF-8') === mb_strtolower('Action Process', 'UTF-8')) {
+        $faturavel = 0;
+    } else {
+        $faturavel = ($faturavel === '1') ? 1 : 0;
+    }
+
     // validações mínimas
     if ($cliente === '' || $projeto === '' || $horas === '' || $dlancamento === '') {
         $erroGeral = "Preencha os campos obrigatórios (Cliente, Projeto, Horas, Data).";
@@ -164,8 +189,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && empty($_POST['editar_id']) && !isse
 // ------------------------
 // FILTROS, PAGINAÇÃO e CONSULTA
 // ------------------------
-$mes = isset($_GET['mes']) && $_GET['mes'] !== '' ? (int) $_GET['mes'] : null;
-$ano = isset($_GET['ano']) && $_GET['ano'] !== '' ? (int) $_GET['ano'] : null;
+$mes = isset($_GET['mes']) && $_GET['mes'] !== '' ? (int) $_GET['mes'] : (int) date('m');
+$ano = isset($_GET['ano']) && $_GET['ano'] !== '' ? (int) $_GET['ano'] : (int) date('Y');
 
 $por_pagina = 20;
 $pagina = isset($_GET['pagina']) ? max(1, (int) $_GET['pagina']) : 1;
@@ -203,7 +228,7 @@ try {
 
 // buscar dados paginados
 try {
-    $selectSql = "SELECT * " . $sqlBase . " ORDER BY dlancamento ASC LIMIT :limit OFFSET :offset";
+    $selectSql = "SELECT * " . $sqlBase . " ORDER BY dlancamento DESC, id DESC LIMIT :limit OFFSET :offset";
     $stmt = $pdo->prepare($selectSql);
     // bind filtros
     foreach ($params as $k => $v) {
@@ -250,6 +275,32 @@ try {
 function h($v)
 {
     return htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
+}
+
+// ------------------------
+// LISTAS PARA SUGESTÃO DE PROJETO E TAREFA POR CLIENTE
+// ------------------------
+try {
+    $stmtOpcoesCliente = $pdo->query("
+        SELECT DISTINCT
+            TRIM(l.cliente) AS cliente,
+            TRIM(l.projeto) AS projeto,
+            TRIM(l.tarefa) AS tarefa
+        FROM lancamentos l
+        INNER JOIN clientes_consultoria c ON TRIM(c.cliente) = TRIM(l.cliente)
+        WHERE c.status = 'Ativo'
+        AND l.cliente IS NOT NULL
+        AND TRIM(l.cliente) <> ''
+        AND (
+            (l.projeto IS NOT NULL AND TRIM(l.projeto) <> '')
+            OR
+            (l.tarefa IS NOT NULL AND TRIM(l.tarefa) <> '')
+        )
+        ORDER BY TRIM(l.cliente) ASC, TRIM(l.projeto) ASC, TRIM(l.tarefa) ASC
+    ");
+    $opcoesClienteProjetoTarefa = $stmtOpcoesCliente->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $opcoesClienteProjetoTarefa = [];
 }
 
 ?>
@@ -463,13 +514,66 @@ function h($v)
         .btn-indicadores:hover {
             background: #2fa4a4;
         }
+
+        .btn-kpi-gestao {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 12px;
+            background: #0078d7;
+            color: #fff;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.8rem;
+            font-weight: 600;
+            transition: background 0.2s ease;
+        }
+
+        .btn-kpi-gestao:hover {
+            background: #1593f5;
+        }
+
+        .info-faturavel {
+            margin-top: 8px;
+            padding: 9px 10px;
+            border-radius: 8px;
+            background: rgba(240, 180, 41, 0.13);
+            border: 1px solid rgba(240, 180, 41, 0.45);
+            color: #f0d58a;
+            font-size: 12px;
+            line-height: 1.35;
+            display: none;
+        }
+
+        .info-faturavel.ativo {
+            display: block;
+        }
+
+        select:disabled,
+        input:disabled {
+            opacity: 0.75;
+            cursor: not-allowed;
+            background: #1e1e2d;
+            color: #cfcfcf;
+        }
+
+        .campo-ajuda {
+            display: block;
+            margin-top: 4px;
+            color: #b8b8c8;
+            font-size: 11px;
+            line-height: 1.3;
+        }
     </style>
 </head>
 
 <body>
     <header>
         <h1><i class="fa-solid fa-clock"></i> Controle de Horas</h1>
-        <a href="logout.php" class="btn-sair"><i class="fa-solid fa-right-from-bracket"></i> Sair</a>
+
+        <a href="logout.php" class="btn-sair">
+            <i class="fa-solid fa-right-from-bracket"></i> Sair
+        </a>
     </header>
 
     <h5 style="margin-bottom:12px;">
@@ -489,7 +593,7 @@ function h($v)
                 <h2><i class="fa-solid fa-plus"></i> Novo Lançamento</h2>
                 <input type="hidden" name="editar_id" id="editar_id" value="">
                 <label><small>Cliente</small></label>
-                <select name="cliente" required>
+                <select name="cliente" id="cliente_select" required>
                     <option value="">Selecione o cliente</option>
                     <?php
                     // Busca clientes distintos da tabela
@@ -506,20 +610,56 @@ function h($v)
                 </select>
 
                 <label><small>Projeto</small></label>
-                <input type="text" name="projeto" placeholder="Projeto" required>
+                <input type="text" name="projeto" id="projeto_input" list="lista_projetos" autocomplete="off"
+                    placeholder="Selecione ou digite um novo projeto" required>
+                <datalist id="lista_projetos"></datalist>
+                <small class="campo-ajuda">As sugestões serão filtradas conforme o cliente selecionado. Caso não exista,
+                    digite um novo projeto.</small>
+
                 <label><small>Tarefa</small></label>
-                <input type="text" name="tarefa" placeholder="Tarefa">
+                <input type="text" name="tarefa" id="tarefa_input" list="lista_tarefas" autocomplete="off"
+                    placeholder="Selecione ou digite uma nova tarefa">
+                <datalist id="lista_tarefas"></datalist>
+                <small class="campo-ajuda">As sugestões serão filtradas pelo cliente e, se informado, pelo projeto
+                    selecionado.</small>
                 <label><small>Fase</small></label>
                 <select type="text" name="fase">
-                    <option value="Mapeamento" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Mapeamento') ? 'selected' : '' ?>>Mapeamento</option>
-                    <option value="Análise" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Análise') ? 'selected' : '' ?>>Análise</option>
-                    <option value="Redesenho" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Redesenho') ? 'selected' : '' ?>>Redesenho</option>
-                    <option value="Validação e Aprovação" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Validação e Aprovação') ? 'selected' : '' ?>>Validação e Aprovação</option>
+                    <option value="Diagnóstico Inicial" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Diagnóstico Inicial') ? 'selected' : '' ?>>Diagnóstico Inicial</option>
+
+                    <option value="Mapeamento AS IS" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Mapeamento AS IS') ? 'selected' : '' ?>>Mapeamento AS IS</option>
+
+                    <option value="Análise Quantitativa" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Análise Quantitativa') ? 'selected' : '' ?>>Análise Quantitativa</option>
+
+                    <option value="Análise Qualitativa" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Análise Qualitativa') ? 'selected' : '' ?>>Análise Qualitativa</option>
+
+                    <option value="Redesenho TO BE" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Redesenho TO BE') ? 'selected' : '' ?>>Redesenho TO BE</option>
+
+                    <option value="Validação de Negócio" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Validação de Negócio') ? 'selected' : '' ?>>Validação de Negócio</option>
+
+                    <option value="Documentação" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Documentação') ? 'selected' : '' ?>>Documentação</option>
+
                     <option value="Desenvolvimento" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Desenvolvimento') ? 'selected' : '' ?>>Desenvolvimento</option>
+
                     <option value="Validação Técnica" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Validação Técnica') ? 'selected' : '' ?>>Validação Técnica</option>
+
+                    <option value="Homologação" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Homologação') ? 'selected' : '' ?>>Homologação</option>
+
                     <option value="Piloto" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Piloto') ? 'selected' : '' ?>>Piloto</option>
+
+                    <option value="Treinamento" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Treinamento') ? 'selected' : '' ?>>Treinamento</option>
+
                     <option value="Produção" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Produção') ? 'selected' : '' ?>>Produção</option>
+
+                    <option value="Acompanhamento Pós-Go Live" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Acompanhamento Pós-Go Live') ? 'selected' : '' ?>>Acompanhamento Pós-Go Live
+                    </option>
+
                     <option value="Processo Entregue" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Processo Entregue') ? 'selected' : '' ?>>Processo Entregue</option>
+
+                    <option value="Suporte" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Suporte') ? 'selected' : '' ?>>Suporte</option>
+
+                    <option value="Deslocamento" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Deslocamento') ? 'selected' : '' ?>>Deslocamento</option>
+
+                    <option value="Alinhamento" <?= (isset($editLead['fase']) && $editLead['fase'] == 'Alinhamento') ? 'selected' : '' ?>>Alinhamento</option>
                 </select>
                 <label><small>Horas (HH:MM)</small></label>
                 <input type="time" name="horas" required>
@@ -528,10 +668,14 @@ function h($v)
                 <label><small>Data</small></label>
                 <input type="date" name="dlancamento" required>
                 <label><small>Faturável?</small></label>
-                <select name="faturavel">
+                <select name="faturavel" id="faturavel">
                     <option value="1" <?= (isset($editLead['faturavel']) && $editLead['faturavel'] == 1) ? 'selected' : '' ?>>Sim</option>
                     <option value="0" <?= (isset($editLead['faturavel']) && $editLead['faturavel'] == 0) ? 'selected' : '' ?>>Não</option>
                 </select>
+                <div id="avisoActionProcess" class="info-faturavel">
+                    Action Process é controle interno. As horas serão registradas automaticamente como <strong>não
+                        faturáveis</strong>.
+                </div>
                 <button type="submit" style="margin-top:10px;"><i class="fa-solid fa-save"></i> Salvar</button>
             </form>
             <?php
@@ -562,9 +706,19 @@ function h($v)
                     <i class="fa-solid fa-table"></i> Lançamentos
                 </h2>
 
-                <a href="indicadores.php?mes=<?= $mesSelecionado ?>&ano=<?= $anoSelecionado ?>" class="btn-indicadores">
-                    <i class="fa-solid fa-chart-line"></i> Indicadores
-                </a>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <a href="indicadores.php?mes=<?= $mesSelecionado ?>&ano=<?= $anoSelecionado ?>"
+                        class="btn-indicadores">
+                        <i class="fa-solid fa-chart-line"></i> Indicadores
+                    </a>
+
+                    <?php if ($podeVerIndicadores): ?>
+                        <a href="indicadores_operacao.php?mes=<?= $mesSelecionado ?>&ano=<?= $anoSelecionado ?>"
+                            class="btn-kpi-gestao">
+                            <i class="fa-solid fa-chart-pie"></i> KPI Gestão
+                        </a>
+                    <?php endif; ?>
+                </div>
             </div>
             <form method="GET" id="filtroForm"
                 style="margin-bottom: 20px; display: flex; gap: 10px; align-items: center;">
@@ -630,7 +784,13 @@ function h($v)
                             <td><?php echo h($m['fase']); ?></td>
                             <td><?php echo h($m['horas']); ?></td>
                             <td><?php echo h($m['observacao']); ?></td>
-                            <td><?php echo $m['faturavel'] == 1 ? 'Sim' : 'Não'; ?></td>
+                            <td>
+                                <?php if ((int) $m['faturavel'] === 1): ?>
+                                    <span style="color:#00c48c; font-weight:700;">Sim</span>
+                                <?php else: ?>
+                                    <span style="color:#f0b429; font-weight:700;">Não</span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <?= !empty($m['dlancamento'])
                                     ? htmlspecialchars(date('d/m/Y', strtotime($m['dlancamento'])))
@@ -643,12 +803,10 @@ function h($v)
                                 <button type="button" class="action-btn edit editarBtn" data-id="<?php echo h($m['id']); ?>"
                                     data-cliente="<?php echo h($m['cliente']); ?>"
                                     data-projeto="<?php echo h($m['projeto']); ?>" data-tarefa="<?php echo h($m['tarefa']); ?>"
-                                    data-fase="<?php echo h($m['fase']); ?>"
-                                    data-horas="<?php echo h($m['horas']); ?>"
+                                    data-fase="<?php echo h($m['fase']); ?>" data-horas="<?php echo h($m['horas']); ?>"
                                     data-observacao="<?php echo h($m['observacao']); ?>"
                                     data-faturavel="<?php echo h($m['faturavel']); ?>"
-                                    data-dlancamento="<?php echo h($m['dlancamento']); ?>"
-                                     title="Editar"><i
+                                    data-dlancamento="<?php echo h($m['dlancamento']); ?>" title="Editar"><i
                                         class="fa-solid fa-pen"></i></button>
                             </td>
                         </tr>
@@ -687,22 +845,236 @@ function h($v)
     </footer>
 
     <script>
-        // preencher formulário para edição
+        const opcoesClienteProjetoTarefa = <?php echo json_encode($opcoesClienteProjetoTarefa, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+
+        const clienteSelect = document.getElementById('cliente_select');
+        const projetoInput = document.getElementById('projeto_input');
+        const tarefaInput = document.getElementById('tarefa_input');
+        const listaProjetos = document.getElementById('lista_projetos');
+        const listaTarefas = document.getElementById('lista_tarefas');
+        const faturavelSelect = document.querySelector('[name=faturavel]');
+        const avisoActionProcess = document.getElementById('avisoActionProcess');
+
+        function normalizarTexto(valor) {
+            return (valor || '')
+                .toString()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .toLowerCase();
+        }
+
+        function limparDatalist(datalist) {
+            if (datalist) {
+                datalist.innerHTML = '';
+            }
+        }
+
+        function adicionarOpcaoDatalist(datalist, valor) {
+            const valorLimpo = (valor || '').toString().trim();
+            if (!datalist || valorLimpo === '') {
+                return;
+            }
+
+            const option = document.createElement('option');
+            option.value = valorLimpo;
+            datalist.appendChild(option);
+        }
+
+        function obterProjetosDoCliente(cliente) {
+            const projetos = new Set();
+            const clienteNormalizado = normalizarTexto(cliente);
+
+            if (!clienteNormalizado) {
+                return [];
+            }
+
+            opcoesClienteProjetoTarefa.forEach(item => {
+                const mesmoCliente = normalizarTexto(item.cliente) === clienteNormalizado;
+                const projeto = (item.projeto || '').toString().trim();
+
+                if (mesmoCliente && projeto !== '') {
+                    projetos.add(projeto);
+                }
+            });
+
+            return Array.from(projetos).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        }
+
+        function obterTarefasDoCliente(cliente, projeto = '') {
+            const tarefas = new Set();
+            const clienteNormalizado = normalizarTexto(cliente);
+            const projetoNormalizado = normalizarTexto(projeto);
+
+            if (!clienteNormalizado) {
+                return [];
+            }
+
+            opcoesClienteProjetoTarefa.forEach(item => {
+                const mesmoCliente = normalizarTexto(item.cliente) === clienteNormalizado;
+                const mesmoProjeto = projetoNormalizado === '' || normalizarTexto(item.projeto) === projetoNormalizado;
+                const tarefa = (item.tarefa || '').toString().trim();
+
+                if (mesmoCliente && mesmoProjeto && tarefa !== '') {
+                    tarefas.add(tarefa);
+                }
+            });
+
+            return Array.from(tarefas).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+        }
+
+        function atualizarProjetosPorCliente(manterValor = false) {
+            if (!clienteSelect || !projetoInput || !listaProjetos) {
+                return;
+            }
+
+            const valorAtual = projetoInput.value;
+
+            limparDatalist(listaProjetos);
+
+            obterProjetosDoCliente(clienteSelect.value).forEach(projeto => {
+                adicionarOpcaoDatalist(listaProjetos, projeto);
+            });
+
+            if (manterValor) {
+                projetoInput.value = valorAtual;
+            } else {
+                projetoInput.value = '';
+            }
+        }
+
+        function atualizarTarefasPorClienteEProjeto(manterValor = false) {
+            if (!clienteSelect || !projetoInput || !tarefaInput || !listaTarefas) {
+                return;
+            }
+
+            const valorAtual = tarefaInput.value;
+
+            limparDatalist(listaTarefas);
+
+            obterTarefasDoCliente(clienteSelect.value, projetoInput.value).forEach(tarefa => {
+                adicionarOpcaoDatalist(listaTarefas, tarefa);
+            });
+
+            if (manterValor) {
+                tarefaInput.value = valorAtual;
+            } else {
+                tarefaInput.value = '';
+            }
+        }
+
+        function aplicarRegraFaturavelActionProcess(forcarSimQuandoCliente = false) {
+            if (!clienteSelect || !faturavelSelect) {
+                return;
+            }
+
+            const clienteSelecionado = normalizarTexto(clienteSelect.value);
+            const actionProcess = normalizarTexto('Action Process');
+
+            if (clienteSelecionado === actionProcess) {
+                faturavelSelect.value = '0';
+                faturavelSelect.disabled = true;
+                faturavelSelect.title = 'Action Process sempre deve ser lançado como não faturável.';
+
+                if (avisoActionProcess) {
+                    avisoActionProcess.classList.add('ativo');
+                }
+            } else {
+                faturavelSelect.disabled = false;
+                faturavelSelect.title = '';
+
+                if (forcarSimQuandoCliente && clienteSelecionado !== '') {
+                    faturavelSelect.value = '1';
+                }
+
+                if (avisoActionProcess) {
+                    avisoActionProcess.classList.remove('ativo');
+                }
+            }
+        }
+
+        function limparProjetoETarefa() {
+            if (projetoInput) {
+                projetoInput.value = '';
+            }
+
+            if (tarefaInput) {
+                tarefaInput.value = '';
+            }
+        }
+
+        if (clienteSelect) {
+            clienteSelect.addEventListener('change', function () {
+                limparProjetoETarefa();
+                atualizarProjetosPorCliente(false);
+                atualizarTarefasPorClienteEProjeto(false);
+                aplicarRegraFaturavelActionProcess(true);
+            });
+        }
+
+        if (projetoInput) {
+            projetoInput.addEventListener('input', function () {
+                atualizarTarefasPorClienteEProjeto(false);
+            });
+        }
+
         document.querySelectorAll('.editarBtn').forEach(btn => {
             btn.addEventListener('click', function () {
                 document.getElementById('editar_id').value = this.dataset.id || '';
-                document.querySelector('[name=cliente]').value = this.dataset.cliente || '';
-                document.querySelector('[name=projeto]').value = this.dataset.projeto || '';
-                document.querySelector('[name=tarefa]').value = this.dataset.tarefa || '';
-                document.querySelector('[name=fase]').value = this.dataset.fase || '';
-                // some browsers require HH:MM for input type time; keep the value if compatible
-                document.querySelector('[name=horas]').value = this.dataset.horas || '';
-                document.querySelector('[name=observacao]').value = this.dataset.observacao || '';
-                document.querySelector('[name=faturavel]').value = this.dataset.faturavel || '';
-                document.querySelector('[name=dlancamento]').value = this.dataset.dlancamento || '';
-                // scroll to top where form is
+
+                if (clienteSelect) {
+                    clienteSelect.value = this.dataset.cliente || '';
+                }
+
+                atualizarProjetosPorCliente(true);
+
+                if (projetoInput) {
+                    projetoInput.value = this.dataset.projeto || '';
+                }
+
+                atualizarTarefasPorClienteEProjeto(true);
+
+                if (tarefaInput) {
+                    tarefaInput.value = this.dataset.tarefa || '';
+                }
+
+                const campoFase = document.querySelector('[name=fase]');
+                const campoHoras = document.querySelector('[name=horas]');
+                const campoObservacao = document.querySelector('[name=observacao]');
+                const campoData = document.querySelector('[name=dlancamento]');
+
+                if (campoFase) {
+                    campoFase.value = this.dataset.fase || '';
+                }
+
+                if (campoHoras) {
+                    campoHoras.value = this.dataset.horas || '';
+                }
+
+                if (campoObservacao) {
+                    campoObservacao.value = this.dataset.observacao || '';
+                }
+
+                if (faturavelSelect) {
+                    faturavelSelect.disabled = false;
+                    faturavelSelect.value = this.dataset.faturavel || '0';
+                }
+
+                if (campoData) {
+                    campoData.value = this.dataset.dlancamento || '';
+                }
+
+                aplicarRegraFaturavelActionProcess(false);
+
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             });
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            atualizarProjetosPorCliente(true);
+            atualizarTarefasPorClienteEProjeto(true);
+            aplicarRegraFaturavelActionProcess(false);
         });
     </script>
 
